@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1e3a8a" id="themeColorMeta">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="UTM Pro">
+    <title>UTM Pro - Tournament Manager</title>
+    
+    <link rel="preconnect" href="https://cdn.tailwindcss.com">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: { colors: { slate: { 850: '#151f32', 900: '#0f172a' } } } }
+        }
+    </script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        
+        .fade-in { animation: fadeIn 0.25s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        * { transition: background-color 0.2s ease, border-color 0.2s ease; }
+        
+        .grab-cursor { cursor: grab; }
+        .grabbing-cursor { cursor: grabbing !important; }
+        
+        .bracket-scroll::-webkit-scrollbar { width: 12px; height: 12px; }
+        .bracket-scroll::-webkit-scrollbar-track { background: transparent; }
+        .bracket-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; border: 3px solid transparent; background-clip: content-box; }
+        .dark .bracket-scroll::-webkit-scrollbar-thumb { background: #475569; border: 3px solid transparent; background-clip: content-box;}
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
+
+        .tab-active { border-bottom: 3px solid #3b82f6; color: #3b82f6; font-weight: 700; }
+        .tab-inactive { color: #64748b; font-weight: 500; }
+        .tab-inactive:hover { color: #0f172a; }
+        .dark .tab-inactive:hover { color: #f8fafc; }
+        
+        input[type="time"], input[type="date"], input[type="number"] { -webkit-appearance: none; appearance: none; }
+        select {
+            -webkit-appearance: none; appearance: none;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 0.5rem center; background-repeat: no-repeat; background-size: 1.5em 1.5em; padding-right: 2rem !important;
+        }
+        .dark select { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e"); }
+
+        @media print {
+            @page { size: landscape; margin: 5mm; }
+            body { background: white !important; color: black !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; overflow: visible !important;}
+            .no-print, .tabs-header, #toast, #matchModal { display: none !important; }
+            .xl\:col-span-8 { grid-column: span 12 / span 12 !important; width: 100% !important; }
+            .max-w-[1500px] { max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
+            .bracket-scroll { overflow: visible !important; height: auto !important; max-height: none !important; display: block !important; }
+            .h-[85vh], .xl\:h-[92vh] { height: auto !important; min-height: 0 !important; overflow: visible !important; box-shadow: none !important; border: none !important;}
+            .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl { box-shadow: none !important; }
+            .border-slate-200, .dark\:border-slate-700 { border-color: #e5e7eb !important; }
+            
+            #view-bracket, #view-itinerary, #view-results, #view-standings { 
+                display: block !important; 
+                position: relative !important;
+                page-break-after: always; 
+                padding: 0 !important; 
+                background: white !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                height: auto !important;
+            }
+            .page-break-avoid { page-break-inside: avoid; margin-bottom: 15px;}
+            .dark\:bg-slate-800 { background-color: white !important; }
+            .dark\:text-white { color: black !important; }
+            .print-header { display: block !important; text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+        }
+        .print-header { display: none; }
+    </style>
+
+    <script>
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+            document.getElementById('themeColorMeta')?.setAttribute('content', '#0f172a');
+        } else {
+            document.documentElement.classList.remove('dark');
+            document.getElementById('themeColorMeta')?.setAttribute('content', '#1e3a8a');
+        }
+
+        const iconSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='192' height='192' viewBox='0 0 192 192'><rect width='192' height='192' rx='48' fill='#3b82f6'/><path d='M96 40c-25 0-45 20-45 45 0 18 10 33 25 40v27l20-10 20 10v-27c15-7 25-22 25-40 0-25-20-45-45-45z' fill='#fff'/></svg>`;
+        const manifest = {
+            name: "UTM Pro", short_name: "UTM Pro", display: "standalone",
+            background_color: "#f8fafc", theme_color: "#3b82f6",
+            icons: [{ src: "data:image/svg+xml;charset=utf-8," + encodeURIComponent(iconSvg), sizes: "192x192", type: "image/svg+xml", purpose: "any maskable" }]
+        };
+        const link = document.createElement('link'); link.rel = 'manifest';
+        link.href = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/json' }));
+        document.head.appendChild(link);
+
+        if ('serviceWorker' in navigator) {
+            const swCode = `
+                const CACHE = 'utm-pro-cache-v8';
+                const urlsToCache = ['https://cdn.tailwindcss.com', 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap'];
+                self.addEventListener('install', e => {
+                    self.skipWaiting();
+                    e.waitUntil(caches.open(CACHE).then(c => Promise.allSettled(urlsToCache.map(u => fetch(u).then(r => c.put(u, r))))));
+                });
+                self.addEventListener('activate', e => e.waitUntil(clients.claim()));
+                self.addEventListener('fetch', e => {
+                    e.respondWith(caches.match(e.request).then(res => res || fetch(e.request).then(fRes => {
+                        return caches.open(CACHE).then(c => { if(e.request.url.startsWith('http')) c.put(e.request, fRes.clone()); return fRes; });
+                    }).catch(() => new Response('Offline', {status: 200}))));
+                });`;
+            navigator.serviceWorker.register(URL.createObjectURL(new Blob([swCode], { type: 'application/javascript' })));
+        }
+
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault(); deferredPrompt = e;
+            setTimeout(() => { document.getElementById('installAppBtn')?.classList.remove('hidden'); }, 500);
+        });
+    </script>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 p-2 sm:p-4 md:p-6 relative min-h-screen">
+
+<!-- Global Toast -->
+<div id="toast" class="hidden fixed top-6 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full shadow-2xl z-[200] fade-in text-sm font-bold transition-all duration-300 bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex items-center gap-2"></div>
+
+<div class="max-w-[1500px] mx-auto grid grid-cols-1 xl:grid-cols-12 gap-6">
+    
+    <!-- LEFT SIDEBAR: SETUP -->
+    <div class="xl:col-span-4 bg-white dark:bg-slate-850 rounded-3xl shadow-lg border border-slate-200 dark:border-slate-700/50 h-fit xl:sticky xl:top-6 z-30 overflow-hidden flex flex-col max-h-[92vh] no-print">
+        
+        <!-- Header -->
+        <div class="p-5 bg-blue-600 dark:bg-blue-700 text-white flex justify-between items-center shrink-0 shadow-sm relative z-[100]">
+            <h1 class="text-lg font-black flex items-center gap-2.5 tracking-wide">
+                <span class="text-2xl drop-shadow-md">🏆</span> UTM PRO
+            </h1>
+            <div class="flex items-center gap-3">
+                <div id="autoSaveIndicator" class="hidden flex items-center gap-1.5 text-[10px] bg-black/25 px-2.5 py-1 rounded-full font-bold shadow-inner">
+                    <span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span> Sync
+                </div>
+                <button onclick="UTM.ThemeManager.toggle()" class="bg-white/20 hover:bg-white/30 p-2 rounded-full transition active:scale-95" title="Toggle Theme">
+                    <svg id="moonIcon" class="w-4 h-4 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                    <svg id="sunIcon" class="w-4 h-4 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                </button>
+                <button id="installAppBtn" onclick="UTM.PWAService.install()" class="hidden bg-white text-blue-700 hover:bg-blue-50 px-3 py-1.5 rounded-full text-xs font-bold shadow transition active:scale-95 flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg> Install
+                </button>
+            </div>
+        </div>
+        
+        <div class="p-5 overflow-y-auto space-y-7 flex-grow custom-scrollbar">
+            
+            <!-- Data Manager -->
+            <div class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 shadow-sm relative z-[90]">
+                <h3 class="font-bold text-slate-700 dark:text-slate-300 text-xs uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg> Data Manager
+                </h3>
+                <div class="flex gap-2">
+                    <button onclick="UTM.StorageManager.exportData()" class="flex-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 text-[11px] font-bold py-2 rounded-lg shadow-sm hover:bg-slate-100 transition active:scale-95">📥 Backup</button>
+                    <label class="flex-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 text-[11px] font-bold py-2 rounded-lg shadow-sm hover:bg-slate-100 transition active:scale-95 text-center cursor-pointer">
+                        📤 Restore <input type="file" accept=".json" class="hidden" onchange="UTM.StorageManager.importData(event)">
+                    </label>
+                    <button onclick="UTM.StorageManager.hardReset()" class="flex-1 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-[11px] font-bold py-2 rounded-lg shadow-sm hover:bg-red-100 transition active:scale-95">🗑️ Reset App</button>
+                </div>
+            </div>
+
+            <!-- Event Details -->
+            <div class="space-y-3 relative z-[80]">
+                <h3 class="font-bold text-slate-800 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700 pb-1.5 text-xs uppercase tracking-wider flex justify-between">
+                    0. Event Details
+                    <button onclick="UTM.TournamentGenerator.loadTemplate()" class="text-[9px] bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded text-slate-500 hover:text-blue-500 transition">Load Template</button>
+                </h3>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Tournament Name</label>
+                        <input type="text" id="tourneyName" placeholder="Summer Cup" class="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm outline-none focus:border-blue-500 transition shadow-inner" onchange="UTM.StorageManager.saveState()">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Sport</label>
+                        <input type="text" id="tourneySport" placeholder="Basketball" class="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm outline-none focus:border-blue-500 transition shadow-inner" onchange="UTM.StorageManager.saveState()">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Structure & Rosters -->
+            <div class="space-y-3 relative z-[70]">
+                <h3 class="font-bold text-slate-800 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700 pb-1.5 text-xs uppercase tracking-wider">1. Structure & Rosters</h3>
+                
+                <div class="grid grid-cols-2 gap-3 relative z-[70]">
+                    <div class="relative z-[70]">
+                        <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Category</label>
+                        <select id="tournamentCategory" onchange="UTM.UIRenderer.updateSubTypes(); UTM.StorageManager.saveState();" class="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:border-blue-500 outline-none text-sm shadow-inner cursor-pointer relative z-[70]">
+                            <option value="knockout">Knock-out & Elimination</option>
+                            <option value="league">League & Round Robin</option>
+                            <option value="combination">Combination (Multi-Stage)</option>
+                            <option value="swiss">Swiss System</option>
+                        </select>
+                    </div>
+                    <div class="relative z-[70]">
+                        <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Specific Format</label>
+                        <select id="tournamentType" onchange="UTM.UIRenderer.handleByesUI(); UTM.StorageManager.saveState();" class="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:border-blue-500 outline-none text-sm shadow-inner cursor-pointer relative z-[70]"></select>
+                    </div>
+                </div>
+
+                <div class="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative z-[50]">
+                    <div class="flex justify-between items-center mb-3">
+                        <label class="block text-xs font-bold text-slate-800 dark:text-slate-200">Teams / Participants</label>
+                        <div class="flex gap-1.5 flex-wrap justify-end">
+                            <label class="text-[10px] bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 hover:bg-green-200 px-2.5 py-1.5 rounded-md font-bold cursor-pointer transition shadow-sm">
+                                CSV <input type="file" accept=".csv" class="hidden" onchange="UTM.CSVManager.import(event)">
+                            </label>
+                            <button onclick="UTM.TournamentGenerator.shuffleRoster()" class="text-[10px] bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-100 px-2.5 py-1.5 rounded-md shadow-sm transition font-semibold active:scale-95">Mix</button>
+                            <button id="addDivBtn" onclick="UTM.UIRenderer.addDivision()" class="hidden text-[10px] bg-blue-600 text-white hover:bg-blue-700 px-2.5 py-1.5 rounded-md font-bold shadow-sm transition active:scale-95">+ Div</button>
+                        </div>
+                    </div>
+                    
+                    <div id="divisionList" class="space-y-3 max-h-48 overflow-y-auto custom-scrollbar pr-2">
+                        <div class="division-item bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl p-3 relative shadow-sm">
+                            <input type="text" class="div-name w-full text-xs font-extrabold text-slate-700 dark:text-slate-200 bg-transparent border-b border-slate-200 dark:border-slate-600 mb-2 outline-none uppercase tracking-widest pb-1" value="Main Pool" onchange="UTM.StorageManager.saveState()">
+                            <textarea class="div-teams w-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-700 rounded-lg p-2.5 outline-none text-sm resize-none custom-scrollbar focus:border-blue-400 transition" rows="4" oninput="UTM.UIRenderer.handleByesUI(); UTM.StorageManager.saveState();" placeholder="Paste teams, one per line..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="byeSetup" class="hidden bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-2xl border border-indigo-200 dark:border-indigo-800 shadow-sm mt-4 relative z-[40]">
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="block text-sm font-bold text-indigo-900 dark:text-indigo-300">Seed Specific Byes</label>
+                        <span class="text-[10px] font-bold bg-indigo-200 dark:bg-indigo-800 text-indigo-800 dark:text-indigo-200 px-2.5 py-0.5 rounded-full"><span id="byeCountText">0</span> Required</span>
+                    </div>
+                    <p class="text-[10px] text-indigo-700 dark:text-indigo-400 mb-3 leading-tight font-medium">Assign specific teams to exact official Bye slots based on rankings.</p>
+                    <div id="byeSlotContainer" class="max-h-48 overflow-y-auto space-y-2 custom-scrollbar pr-2 pb-2"></div>
+                </div>
+            </div>
+
+            <!-- Logistics -->
+            <div class="space-y-3 relative z-[30]">
+                <h3 class="font-bold text-slate-800 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700 pb-1.5 text-xs uppercase tracking-wider">2. Venues & Timings</h3>
+                
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Start Date</label>
+                        <input type="date" id="startDate" class="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:border-blue-500 outline-none shadow-inner" onchange="UTM.StorageManager.saveState()">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">End Date</label>
+                        <input type="date" id="endDate" class="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:border-blue-500 outline-none shadow-inner" onchange="UTM.StorageManager.saveState()">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Venues / Grounds (Comma separated)</label>
+                    <input type="text" id="groundNames" value="1" placeholder="Court 1, Court 2" class="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:border-blue-500 outline-none shadow-inner" onchange="UTM.StorageManager.saveState()">
+                </div>
+
+                <div class="grid grid-cols-3 gap-2">
+                    <div>
+                        <label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Match (Min)</label>
+                        <input type="number" id="matchDuration" value="60" min="5" step="5" class="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm shadow-inner text-center focus:border-blue-500 outline-none" onchange="UTM.StorageManager.saveState()">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Buffer</label>
+                        <input type="number" id="bufferDuration" value="10" min="0" step="5" class="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm shadow-inner text-center focus:border-blue-500 outline-none" onchange="UTM.StorageManager.saveState()">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Team Rest</label>
+                        <input type="number" id="restDuration" value="30" min="0" step="5" class="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm shadow-inner text-center focus:border-blue-500 outline-none" onchange="UTM.StorageManager.saveState()">
+                    </div>
+                </div>
+
+                <div class="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm mt-4">
+                    <label class="block text-xs font-bold text-slate-800 dark:text-slate-200 border-b border-slate-200 dark:border-slate-600 pb-2 mb-3">Daily Sessions</label>
+                    <div class="space-y-3 text-xs">
+                        <div class="grid grid-cols-[80px_1fr_1fr] gap-2 items-center">
+                            <span class="font-bold text-slate-500">Morning</span>
+                            <input type="time" id="mStart" value="09:00" class="p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 w-full" onchange="UTM.StorageManager.saveState()">
+                            <input type="time" id="mEnd" value="12:00" class="p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 w-full" onchange="UTM.StorageManager.saveState()">
+                        </div>
+                        <div class="grid grid-cols-[80px_1fr_1fr] gap-2 items-center">
+                            <span class="font-bold text-slate-500">Afternoon</span>
+                            <input type="time" id="aStart" value="13:00" class="p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 w-full" onchange="UTM.StorageManager.saveState()">
+                            <input type="time" id="aEnd" value="17:00" class="p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 w-full" onchange="UTM.StorageManager.saveState()">
+                        </div>
+                        <div class="grid grid-cols-[80px_1fr_1fr] gap-2 items-center">
+                            <span class="font-bold text-slate-500">Evening</span>
+                            <input type="time" id="eStart" value="18:00" class="p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 w-full" onchange="UTM.StorageManager.saveState()">
+                            <input type="time" id="eEnd" value="21:00" class="p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 w-full" onchange="UTM.StorageManager.saveState()">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 mt-4">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Opening Ceremony</label>
+                        <input type="time" id="openingTime" value="08:00" class="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm outline-none shadow-inner transition" onchange="UTM.StorageManager.saveState()">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Closing Ceremony</label>
+                        <input type="time" id="closingTime" value="18:00" class="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm outline-none shadow-inner transition" onchange="UTM.StorageManager.saveState()">
+                    </div>
+                </div>
+
+                <div class="bg-red-50 dark:bg-red-900/10 p-4 rounded-2xl border border-red-200 dark:border-red-800/50 shadow-sm mt-4">
+                    <label class="block text-xs font-bold text-red-800 dark:text-red-400 border-b border-red-200 dark:border-red-800/50 pb-2 mb-3">Rest Days & Exclusions</label>
+                    <div class="flex flex-col gap-2 text-xs">
+                        <input type="date" id="exceptionDate" class="w-full p-2.5 border rounded-lg border-red-300 dark:border-red-700 outline-none bg-white dark:bg-slate-800 shadow-sm">
+                        <div class="grid grid-cols-[1fr_auto] gap-2">
+                            <select id="exceptionSession" class="w-full p-2.5 border rounded-lg border-red-300 dark:border-red-700 outline-none bg-white dark:bg-slate-800 shadow-sm cursor-pointer">
+                                <option value="All">Full Day Skip</option>
+                                <option value="Morning">Skip Morning</option>
+                                <option value="Afternoon">Skip Afternoon</option>
+                                <option value="Evening">Skip Evening</option>
+                            </select>
+                            <button onclick="UTM.ScheduleEngine.addException()" class="bg-red-600 hover:bg-red-700 text-white px-5 rounded-lg font-bold transition active:scale-95 shadow-sm">Add</button>
+                        </div>
+                    </div>
+                    <div id="exceptionList" class="space-y-1.5 max-h-24 overflow-y-auto custom-scrollbar mt-3"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="p-4 sm:p-5 bg-white dark:bg-slate-850 border-t border-slate-200 dark:border-slate-700/50 shrink-0 relative z-[100]">
+            <button onclick="UTM.TournamentGenerator.generate()" class="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl shadow-lg transition-all transform active:scale-[0.98] text-sm tracking-widest uppercase">
+                GENERATE TOURNAMENT
+            </button>
+        </div>
+    </div>
+
+    <!-- RIGHT MAIN AREA: VIEWS -->
+    <div class="xl:col-span-8 space-y-6 min-w-0">
+        
+        <div class="bg-white dark:bg-slate-850 rounded-3xl shadow-lg border border-slate-200 dark:border-slate-700/50 flex flex-col h-[85vh] xl:h-[92vh] relative overflow-hidden">
+            
+            <!-- dynamic header tabs -->
+            <div class="flex flex-col md:flex-row justify-between md:items-end border-b border-slate-200 dark:border-slate-700 px-4 sm:px-6 pt-5 shrink-0 bg-slate-50 dark:bg-slate-900 rounded-t-3xl tabs-header gap-4 relative z-40">
+                <div class="flex gap-6 overflow-x-auto custom-scrollbar w-full md:w-auto pb-1">
+                    <button onclick="UTM.UIRenderer.switchTab('bracket')" id="tab-bracket" class="pb-3 text-sm tab-active transition whitespace-nowrap">Bracket View</button>
+                    <button onclick="UTM.UIRenderer.switchTab('itinerary')" id="tab-itinerary" class="pb-3 text-sm tab-inactive transition flex items-center gap-2 whitespace-nowrap">
+                        Master Schedule <span id="matchCountBadge" class="hidden bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-0.5 rounded-full text-[10px] font-bold"></span>
+                    </button>
+                    <button onclick="UTM.UIRenderer.switchTab('results')" id="tab-results" class="pb-3 text-sm tab-inactive transition flex items-center gap-2 whitespace-nowrap">Live Results</button>
+                    <button onclick="UTM.UIRenderer.switchTab('standings')" id="tab-standings" class="hidden pb-3 text-sm tab-inactive transition flex items-center gap-2 whitespace-nowrap">League Standings</button>
+                </div>
+                
+                <div class="flex gap-2 pb-3 shrink-0 self-start md:self-end">
+                    <input type="text" id="searchMatches" placeholder="Filter matches..." class="hidden px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs outline-none focus:border-blue-500 shadow-sm" onkeyup="UTM.UIRenderer.filterMatches(this.value)">
+                    <button onclick="UTM.ExportManager.exportCSV()" id="exportBtn" class="hidden bg-green-50 dark:bg-green-900/30 hover:bg-green-100 text-green-700 border border-green-200 dark:border-green-800 px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm active:scale-95"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg> CSV</button>
+                    <button onclick="window.print()" id="printBtn" class="hidden bg-white dark:bg-slate-700 hover:bg-slate-50 text-slate-700 dark:text-white border border-slate-300 dark:border-slate-600 px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm active:scale-95"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg> PDF/Print</button>
+                </div>
+            </div>
+            
+            <div id="printHeader" class="print-header pt-6"></div>
+
+            <div id="view-bracket" class="p-4 md:p-8 flex-grow overflow-auto relative custom-scrollbar bg-slate-50 dark:bg-slate-900 bracket-scroll grab-cursor">
+                <div id="scheduleOutput" class="text-slate-400 flex flex-col items-center justify-center h-full fade-in min-h-[600px] w-full min-w-max pointer-events-none">
+                    <svg class="w-20 h-20 text-slate-200 dark:text-slate-700 mb-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                    <p class="text-sm font-bold tracking-widest uppercase">Ready for data.</p>
+                </div>
+            </div>
+
+            <div id="view-itinerary" class="hidden p-4 sm:p-8 flex-grow bg-white dark:bg-slate-850 overflow-auto custom-scrollbar transition-colors">
+                <div id="itineraryOutput" class="space-y-4 fade-in"></div>
+            </div>
+
+            <div id="view-results" class="hidden p-4 sm:p-8 flex-grow bg-slate-50 dark:bg-slate-900 overflow-auto custom-scrollbar transition-colors">
+                <div id="resultsOutput" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 fade-in"></div>
+            </div>
+
+            <div id="view-standings" class="hidden p-4 sm:p-8 flex-grow bg-white dark:bg-slate-850 overflow-auto custom-scrollbar transition-colors">
+                <div id="standingsOutput" class="fade-in max-w-5xl mx-auto"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- LIVE MATCH CENTER MODAL -->
+<div id="matchModal" class="hidden fixed inset-0 bg-slate-900/90 dark:bg-black/90 z-[150] flex items-center justify-center backdrop-blur-md p-4">
+    <div class="bg-white dark:bg-slate-850 rounded-3xl w-full max-w-5xl shadow-2xl flex flex-col overflow-hidden fade-in border border-slate-200 dark:border-slate-700">
+        
+        <div class="bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 p-4 sm:p-6 flex justify-between items-center border-b border-slate-100 dark:border-slate-700 shadow-sm relative z-10">
+            <h2 class="font-black text-xl flex items-center gap-3 tracking-tight">
+                <span class="w-3 h-3 rounded-full bg-red-500 animate-pulse shadow-[0_0_12px_rgba(239,68,68,0.8)]" id="modalLiveDot"></span>
+                <span id="modalTitleText">Live Match Center</span>
+            </h2>
+            <div class="flex items-center gap-4">
+                <div class="text-[11px] bg-slate-100 dark:bg-slate-900 px-4 py-2 rounded-xl font-bold text-slate-500 uppercase border border-slate-200 dark:border-slate-700" id="modalMatchId">Match ID</div>
+                <button onclick="UTM.MatchEngine.closeCenter()" class="text-slate-400 hover:text-slate-800 dark:hover:text-white transition bg-slate-50 dark:bg-slate-700 hover:bg-slate-200 rounded-full w-10 h-10 flex items-center justify-center font-bold text-lg">✕</button>
+            </div>
+        </div>
+        
+        <div class="p-6 sm:p-8 grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-8 items-stretch bg-slate-50 dark:bg-slate-900 relative">
+            
+            <div id="modalCompletedOverlay" class="hidden absolute inset-0 bg-white/95 dark:bg-slate-900/95 z-30 flex items-center justify-center backdrop-blur-md">
+                <div class="text-center fade-in">
+                    <div class="text-green-500 text-7xl mb-4 drop-shadow-md">✔</div>
+                    <div class="text-4xl font-black text-slate-800 dark:text-white uppercase tracking-widest">Match Final</div>
+                    <button onclick="UTM.MatchEngine.closeCenter()" class="mt-8 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-10 py-4 rounded-2xl font-black shadow-xl hover:scale-105 transition active:scale-95 uppercase tracking-wider text-sm">Close Center</button>
+                </div>
+            </div>
+
+            <!-- TEAM 1 -->
+            <div class="text-center bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-md border border-slate-200 dark:border-slate-700 relative overflow-hidden flex flex-col justify-between">
+                <div class="absolute top-0 left-0 w-full h-2" id="modalColor1"></div>
+                <div>
+                    <div class="w-20 h-20 mx-auto rounded-full text-white flex items-center justify-center text-3xl font-black mb-4 shadow-lg border-[4px] border-white dark:border-slate-700" id="modalIcon1"></div>
+                    <h3 class="text-xl font-bold text-slate-800 dark:text-white truncate mb-2" id="modalT1">Team 1</h3>
+                    <div class="text-[10px] font-bold text-red-500 bg-red-50 dark:bg-red-900/20 px-3 py-1 rounded-full inline-block mb-4 border border-red-100 dark:border-red-900/50">Fouls: <span id="modalFouls1">0</span></div>
+                </div>
+                <div class="text-8xl font-black text-slate-800 dark:text-white tracking-tighter drop-shadow-sm mb-6" id="modalScore1">0</div>
+                <div class="grid grid-cols-2 gap-3 mt-auto">
+                    <button onclick="UTM.MatchEngine.updateScore(1, 1)" class="bg-slate-900 dark:bg-white hover:bg-black text-white dark:text-slate-900 py-4 rounded-2xl font-black shadow-md transition active:scale-95 text-lg">PTS +1</button>
+                    <button onclick="UTM.MatchEngine.updateScore(1, -1)" class="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-600 text-slate-500 py-4 rounded-2xl font-black transition active:scale-95 text-lg">PTS -1</button>
+                    <button onclick="UTM.MatchEngine.updateFoul(1, 1)" class="col-span-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 py-2.5 rounded-xl font-bold transition active:scale-95 text-sm mt-1">Add Foul</button>
+                </div>
+            </div>
+            
+            <!-- CENTER DASHBOARD -->
+            <div class="text-center flex flex-col items-center justify-center order-first md:order-none mb-6 md:mb-0 w-full max-w-[280px] mx-auto">
+                <div class="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Match Timer</div>
+                <div class="text-6xl font-mono font-black text-slate-800 dark:text-white bg-white dark:bg-slate-800 px-6 py-5 rounded-3xl border-2 border-slate-100 dark:border-slate-700 shadow-lg w-full tracking-tighter" id="modalTimer">00:00</div>
+                <div class="grid grid-cols-2 gap-3 mt-6 w-full">
+                    <button onclick="UTM.MatchEngine.toggleTimer()" id="timerBtn" class="bg-blue-600 text-white py-4 rounded-2xl font-black shadow-md hover:bg-blue-700 transition transform active:scale-95 tracking-wide uppercase text-sm">Start</button>
+                    <button onclick="UTM.MatchEngine.finish()" class="bg-green-600 text-white py-4 rounded-2xl font-black shadow-md hover:bg-green-700 transition transform active:scale-95 tracking-wide uppercase text-sm">Finish</button>
+                </div>
+                <div class="w-full mt-6">
+                    <textarea id="matchNotes" class="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-xs outline-none focus:border-blue-500 custom-scrollbar resize-none shadow-inner" rows="3" placeholder="Official match notes / referee comments..."></textarea>
+                </div>
+                <button onclick="UTM.MatchEngine.reset()" class="mt-6 text-xs text-slate-400 hover:text-red-500 font-bold transition underline underline-offset-4">Reset Match Data</button>
+            </div>
+            
+            <!-- TEAM 2 -->
+            <div class="text-center bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-md border border-slate-200 dark:border-slate-700 relative overflow-hidden flex flex-col justify-between">
+                <div class="absolute top-0 left-0 w-full h-2" id="modalColor2"></div>
+                <div>
+                    <div class="w-20 h-20 mx-auto rounded-full text-white flex items-center justify-center text-3xl font-black mb-4 shadow-lg border-[4px] border-white dark:border-slate-700" id="modalIcon2"></div>
+                    <h3 class="text-xl font-bold text-slate-800 dark:text-white truncate mb-2" id="modalT2">Team 2</h3>
+                    <div class="text-[10px] font-bold text-red-500 bg-red-50 dark:bg-red-900/20 px-3 py-1 rounded-full inline-block mb-4 border border-red-100 dark:border-red-900/50">Fouls: <span id="modalFouls2">0</span></div>
+                </div>
+                <div class="text-8xl font-black text-slate-800 dark:text-white tracking-tighter drop-shadow-sm mb-6" id="modalScore2">0</div>
+                <div class="grid grid-cols-2 gap-3 mt-auto">
+                    <button onclick="UTM.MatchEngine.updateScore(2, 1)" class="bg-slate-900 dark:bg-white hover:bg-black text-white dark:text-slate-900 py-4 rounded-2xl font-black shadow-md transition active:scale-95 text-lg">PTS +1</button>
+                    <button onclick="UTM.MatchEngine.updateScore(2, -1)" class="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-600 text-slate-500 py-4 rounded-2xl font-black transition active:scale-95 text-lg">PTS -1</button>
+                    <button onclick="UTM.MatchEngine.updateFoul(2, 1)" class="col-span-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 py-2.5 rounded-xl font-bold transition active:scale-95 text-sm mt-1">Add Foul</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white dark:bg-slate-850 p-6 border-t border-slate-200 dark:border-slate-700 shadow-[0_-4px_10px_-1px_rgba(0,0,0,0.05)] z-10 relative">
+            <h3 class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4 flex justify-between items-center">
+                <span>Live Event Log</span>
+            </h3>
+            <ul id="modalEvents" class="space-y-2.5 max-h-32 overflow-y-auto text-sm text-slate-700 dark:text-slate-300 custom-scrollbar pr-2"></ul>
+        </div>
+    </div>
+</div>
+
+<script>
+window.UTM = (() => {
+    
+    // --- 1. STATE & CONSTANTS ---
+    const DB_KEY = 'utm_pro_offline_v15'; 
+    const COLORS = ['bg-[#10b981]', 'bg-[#3b82f6]', 'bg-[#f97316]', 'bg-[#ef4444]', 'bg-[#a855f7]', 'bg-[#ec4899]', 'bg-[#14b8a6]', 'bg-[#facc15]'];
+    
+    let State = { matches: [], itinerary: [], exceptions: [], results: {}, colors: {}, counter: 1 };
+
+    // --- 2. THEME & PWA MANAGERS ---
+    const ThemeManager = {
+        toggle() {
+            const html = document.documentElement;
+            if(html.classList.contains('dark')) {
+                html.classList.remove('dark'); localStorage.setItem('theme', 'light');
+                document.getElementById('themeColorMeta')?.setAttribute('content', '#1e3a8a');
+            } else {
+                html.classList.add('dark'); localStorage.setItem('theme', 'dark');
+                document.getElementById('themeColorMeta')?.setAttribute('content', '#0f172a');
+            }
+        }
+    };
+
+    const PWAService = {
+        install() {
+            if (typeof deferredPrompt !== 'undefined' && deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choice) => {
+                    if (choice.outcome === 'accepted') {
+                        const btn = document.getElementById('installAppBtn');
+                        if (btn) btn.classList.add('hidden');
+                    }
+                    deferredPrompt = null;
+                });
+            }
+        }
+    };
+
+    // --- 3. UTILITIES ---
+    const Utils = {
+        toast(msg, err = false) {
+            const t = document.getElementById('toast');
+            if(!t) return;
+            t.innerHTML = err ? `❌ ${msg}` : `✅ ${msg}`;
+            t.className = `fixed top-6 left-1/2 transform -translate-x-1/2 px-6 py-3.5 rounded-full shadow-2xl z-[200] fade-in text-sm font-bold transition-all bg-${err?'red-600':'slate-900'} dark:${err?'bg-red-600':'bg-white'} text-white dark:${err?'text-white':'text-slate-900'} flex items-center gap-2`;
+            t.classList.remove('hidden');
+            setTimeout(() => t.classList.add('hidden'), 3500);
+        },
+        parseDate(dStr) {
+            if (!dStr) return new Date();
+            let d = new Date(dStr);
+            if (!isNaN(d.getTime())) return d;
+            let p = dStr.split(/[-/]/);
+            if (p.length === 3) { d = p[0].length===4 ? new Date(p[0], p[1]-1, p[2]) : new Date(p[2], p[1]-1, p[0]); if (!isNaN(d.getTime())) return d; }
+            return new Date(); 
+        },
+        toYMD(d) { return (!d || isNaN(d.getTime())) ? "" : `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; },
+        parseTime(tStr) {
+            if (!tStr) return 0;
+            let [h, m] = String(tStr).replace(/am|pm/i, '').trim().split(':').map(Number);
+            return (isNaN(h) || isNaN(m)) ? 0 : h*60 + m;
+        },
+        formatTime(m) {
+            if(isNaN(m) || m===undefined) return "TBD";
+            let h = Math.floor(m/60), mins = m%60, ampm = h>=12?'PM':'AM';
+            h = h%12; if(h===0) h=12; return `${h}:${mins<10?'0'+mins:mins} ${ampm}`;
+        },
+        getColor(team) {
+            let n = String(team||'');
+            if(!n || n.startsWith('Winner') || n.startsWith('1st') || n.startsWith('2nd')) return 'bg-slate-300 dark:bg-slate-600';
+            if(!State.colors[n]) State.colors[n] = COLORS[Object.keys(State.colors).length % COLORS.length];
+            return State.colors[n];
+        }
+    };
+
+    // --- 4. STORAGE MANAGER ---
+    const StorageManager = {
+        saveState() {
+            const ind = document.getElementById('autoSaveIndicator');
+            if(ind) { ind.classList.remove('hidden'); setTimeout(() => ind.classList.add('hidden'), 1500); }
+            
+            const payload = {
+                inputs: {
+                    tourneyName: document.getElementById('tourneyName')?.value || '', 
+                    tourneySport: document.getElementById('tourneySport')?.value || '',
+                    category: document.getElementById('tournamentCategory')?.value || 'knockout', 
+                    type: document.getElementById('tournamentType')?.value || 'single_elim',
+                    startDate: document.getElementById('startDate')?.value || '', 
+                    endDate: document.getElementById('endDate')?.value || '',
+                    groundNames: document.getElementById('groundNames')?.value || '', 
+                    matchDuration: document.getElementById('matchDuration')?.value || 60,
+                    bufferDuration: document.getElementById('bufferDuration')?.value || 10, 
+                    restDuration: document.getElementById('restDuration')?.value || 30,
+                    mStart: document.getElementById('mStart')?.value || '09:00', 
+                    mEnd: document.getElementById('mEnd')?.value || '12:00',
+                    aStart: document.getElementById('aStart')?.value || '13:00', 
+                    aEnd: document.getElementById('aEnd')?.value || '17:00',
+                    eStart: document.getElementById('eStart')?.value || '18:00', 
+                    eEnd: document.getElementById('eEnd')?.value || '21:00',
+                    openingTime: document.getElementById('openingTime')?.value || '08:00', 
+                    closingTime: document.getElementById('closingTime')?.value || '18:00'
+                },
+                rosters: Array.from(document.querySelectorAll('.division-item')).map(d => ({
+                    name: d.querySelector('.div-name').value,
+                    teams: d.querySelector('.div-teams').value
+                })),
+                seededByes: (() => {
+                    let b = {};
+                    document.querySelectorAll('.bye-select').forEach(s => { if(s.value) b[s.dataset.index] = s.value; });
+                    return b;
+                })(),
+                exceptions: Array.isArray(State.exceptions) ? State.exceptions : [], 
+                matches: Array.isArray(State.matches) ? State.matches : [],
+                itinerary: Array.isArray(State.itinerary) ? State.itinerary : [], 
+                results: State.results || {},
+                counter: State.counter || 1, 
+                colors: State.colors || {},
+                bracketHtml: document.getElementById('scheduleOutput')?.innerHTML || '', 
+                itineraryHtml: document.getElementById('itineraryOutput')?.innerHTML || ''
+            };
+            localStorage.setItem(DB_KEY, JSON.stringify(payload));
+        },
+        loadState() {
+            const saved = localStorage.getItem(DB_KEY);
+            if (!saved) {
+                let t = new Date(); 
+                if(document.getElementById('startDate')) document.getElementById('startDate').value = t.toISOString().split('T')[0];
+                if(document.getElementById('exceptionDate')) document.getElementById('exceptionDate').value = t.toISOString().split('T')[0];
+                t.setDate(t.getDate()+1); 
+                if(document.getElementById('endDate')) document.getElementById('endDate').value = t.toISOString().split('T')[0];
+                UIRenderer.updateSubTypes(); return;
+            }
+            try {
+                const s = JSON.parse(saved);
+                for (const [k, v] of Object.entries(s.inputs)) { if (document.getElementById(k) && v !== undefined) document.getElementById(k).value = v; }
+                
+                if (s.rosters && s.rosters.length > 0) {
+                    const list = document.getElementById('divisionList');
+                    if(list) {
+                        list.innerHTML = "";
+                        s.rosters.forEach(r => {
+                            const div = document.createElement('div');
+                            div.className = 'division-item bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl p-3 relative shadow-sm mt-3 fade-in';
+                            div.innerHTML = `<button onclick="this.parentElement.remove(); UTM.UIRenderer.handleByesUI(); UTM.StorageManager.saveState();" class="absolute top-2 right-2 text-slate-500 hover:text-red-600 font-bold w-6 h-6 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center transition">✕</button>
+                            <input type="text" class="div-name w-[85%] text-xs font-extrabold bg-transparent border-b border-slate-200 dark:border-slate-600 mb-2 pb-1 uppercase text-slate-700 dark:text-slate-200" onchange="UTM.StorageManager.saveState()">
+                            <textarea class="div-teams w-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-700 rounded-lg p-2.5 text-sm custom-scrollbar outline-none focus:border-blue-400 transition" rows="3" oninput="UTM.UIRenderer.handleByesUI(); UTM.StorageManager.saveState();"></textarea>`;
+                            div.querySelector('.div-name').value = r.name || '';
+                            div.querySelector('.div-teams').value = r.teams || '';
+                            list.appendChild(div);
+                        });
+                    }
+                } else if (s.rosterHtml) {
+                    const list = document.getElementById('divisionList');
+                    if (list) list.innerHTML = s.rosterHtml;
+                }
+
+                UIRenderer.updateSubTypes(); 
+                if (s.inputs.type && document.getElementById('tournamentType')) {
+                    document.getElementById('tournamentType').value = s.inputs.type; 
+                }
+                
+                State.exceptions = Array.isArray(s.exceptions) ? s.exceptions : []; 
+                State.matches = Array.isArray(s.matches) ? s.matches : [];
+                State.itinerary = (Array.isArray(s.itinerary) ? s.itinerary : []).map(i => { i.date = new Date(i.date); return i; });
+                State.results = s.results || {}; 
+                State.counter = s.counter || 1; 
+                State.colors = s.colors || {};
+
+                UIRenderer.handleByesUI();
+                if (s.seededByes) {
+                    document.querySelectorAll('.bye-select').forEach(sel => {
+                        if (s.seededByes[sel.dataset.index]) sel.value = s.seededByes[sel.dataset.index];
+                    });
+                }
+
+                const outBracket = document.getElementById("scheduleOutput");
+                if (s.bracketHtml && outBracket) {
+                    outBracket.innerHTML = s.bracketHtml; 
+                    outBracket.className = "block text-slate-800 dark:text-slate-200 pointer-events-auto";
+                }
+                const outItin = document.getElementById('itineraryOutput');
+                if (s.itineraryHtml && outItin) outItin.innerHTML = s.itineraryHtml;
+                
+                UIRenderer.renderExceptions(); 
+                if(Object.keys(State.results).length > 0) UIRenderer.renderResults();
+                
+                if (State.matches.length > 0) {
+                    ['printBtn','exportBtn','matchCountBadge','searchMatches'].forEach(id => {
+                        let el = document.getElementById(id);
+                        if(el) el.classList.remove('hidden');
+                    });
+                    const badge = document.getElementById('matchCountBadge');
+                    if(badge) badge.innerText = `${State.matches.length} Matches`;
+                    
+                    const catEl = document.getElementById('tournamentCategory');
+                    const tabSt = document.getElementById('tab-standings');
+                    if (catEl && tabSt) {
+                        if(['league','swiss'].includes(catEl.value)) { 
+                            tabSt.classList.remove('hidden'); 
+                            UIRenderer.calcStandings(); 
+                        } else {
+                            tabSt.classList.add('hidden');
+                        }
+                    }
+                }
+                UIRenderer.initDrag();
+            } catch (e) { console.error("Load State Error:", e); Utils.toast("Resetting broken data.", true); localStorage.removeItem(DB_KEY); }
+        },
+        hardReset() { if(confirm("Wipe all tournament data? Cannot be undone.")) { localStorage.removeItem(DB_KEY); location.reload(); } },
+        exportData() {
+            this.saveState(); const d = localStorage.getItem(DB_KEY); if(!d) return Utils.toast("No data", true);
+            const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([d], {type:'application/json;charset=utf-8;'}));
+            const tName = document.getElementById('tourneyName')?.value || 'Tourney';
+            a.download = `${tName.replace(/\s+/g,'_')}.json`; a.click();
+        },
+        importData(e) {
+            const f = e.target.files[0]; if(!f) return;
+            const r = new FileReader(); r.onload = (ev) => {
+                try { JSON.parse(ev.target.result); localStorage.setItem(DB_KEY, ev.target.result); Utils.toast("Restoring..."); setTimeout(()=>location.reload(),800); } 
+                catch(err) { Utils.toast("Invalid file", true); }
+            }; r.readAsText(f, "UTF-8");
+        }
+    };
+
+    // --- 5. DATA EXPORT MANAGERS ---
+    const CSVManager = {
+        import(e) {
+            const f = e.target.files[0]; if(!f) return; const r = new FileReader();
+            r.onload = ev => {
+                const t = [...new Set(ev.target.result.split(/[\r\n]+/).map(l => l.split(',')[0].trim()).filter(x => x && !['team','name'].includes(x.toLowerCase())))];
+                if(t.length > 0) { const ta = document.querySelector('.div-teams'); if(ta) { ta.value = (ta.value.trim() ? ta.value.trim() + '\n' : '') + t.join('\n'); UIRenderer.handleByesUI(); StorageManager.saveState(); Utils.toast(`Imported ${t.length} teams`); } } else Utils.toast("No valid teams", true);
+            }; r.readAsText(f); e.target.value = '';
+        }
+    };
+
+    const ExportManager = {
+        exportCSV() {
+            if(State.itinerary.length===0) return;
+            let csv = "Date,Time,Session,Round,Match ID,Team 1,Score 1,,Score 2,Team 2,Venue\n";
+            State.itinerary.forEach(i => {
+                let d = isNaN(i.date) ? "TBD" : i.date.toLocaleDateString(); let t = Utils.formatTime(i.timeMins);
+                if(i.type === 'ceremony') csv += `"${d}","${t}","-","-","-","${i.name}","-","-","-","-","-"\n`;
+                else { let r = State.results[i.id]; csv += `"${d}","${t}","${i.sessionName}","${i.round}","${i.id}","${i.t1}","${r?r.score1:'-'}","VS","${r?r.score2:'-'}","${i.t2}","${i.ground}"\n`; }
+            });
+            const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+            const tName = document.getElementById('tourneyName')?.value || 'Data';
+            a.download = `${tName.replace(/\s+/g,'_')}.csv`; a.click();
+        }
+    };
+
+    // --- 6. UI RENDERER ---
+    const UIRenderer = {
+        formats: {
+            knockout: [{id:"single_elim",name:"Single Elim"}, {id:"double_elim",name:"Double Elim"}],
+            league: [{id:"single_league",name:"Single Round Robin"}, {id:"double_league",name:"Double Round Robin"}],
+            combination: [{id:"league_knockout",name:"League -> Knockout"}, {id:"knockout_league",name:"Knockout -> League"}, {id:"knockout_knockout",name:"KO -> KO"}, {id:"league_league",name:"League -> League"}],
+            swiss: [{id:"swiss_sys",name:"Swiss System"}]
+        },
+        updateSubTypes() {
+            const catEl = document.getElementById("tournamentCategory");
+            if (!catEl) return;
+            const cat = catEl.value || "knockout"; 
+            const sel = document.getElementById("tournamentType");
+            if(sel) {
+                sel.innerHTML = ""; 
+                if (this.formats[cat]) {
+                    this.formats[cat].forEach(t => sel.add(new Option(t.name, t.id)));
+                }
+            }
+            const addDivBtn = document.getElementById("addDivBtn");
+            if(addDivBtn) addDivBtn.classList.toggle("hidden", !['league','combination'].includes(cat));
+            this.handleByesUI();
+        },
+        switchTab(id) {
+            ['bracket','itinerary','results','standings'].forEach(t => {
+                const el = document.getElementById(`view-${t}`), tab = document.getElementById(`tab-${t}`);
+                if(el && tab) { el.classList.toggle('hidden', t!==id); tab.className = `pb-3 text-sm whitespace-nowrap transition flex items-center gap-2 ${t===id?'tab-active':'tab-inactive'}`; }
+            });
+            const sm = document.getElementById('searchMatches');
+            if(sm) sm.classList.toggle('hidden', id!=='itinerary');
+        },
+        addDivision() {
+            const list = document.getElementById('divisionList');
+            if(!list) return;
+            const div = document.createElement('div');
+            div.className = 'division-item bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl p-3 relative shadow-sm mt-3 fade-in';
+            div.innerHTML = `<button onclick="this.parentElement.remove(); UTM.UIRenderer.handleByesUI(); UTM.StorageManager.saveState();" class="absolute top-2 right-2 text-slate-500 hover:text-red-600 font-bold w-6 h-6 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center transition">✕</button><input type="text" class="div-name w-[85%] text-xs font-extrabold bg-transparent border-b border-slate-200 dark:border-slate-600 mb-2 pb-1 uppercase text-slate-700 dark:text-slate-200" value="Pool ${String.fromCharCode(64+list.children.length+1)}" onchange="UTM.StorageManager.saveState()"><textarea class="div-teams w-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-700 rounded-lg p-2 text-sm custom-scrollbar outline-none focus:border-blue-400" rows="3" oninput="UTM.UIRenderer.handleByesUI(); UTM.StorageManager.saveState();"></textarea>`;
+            list.appendChild(div); StorageManager.saveState();
+        },
+        handleByesUI() {
+            const typeEl = document.getElementById("tournamentType");
+            const ui = document.getElementById("byeSetup");
+            if (!typeEl || !ui) return;
+            const fId = typeEl.value;
+            const tm = TournamentGenerator.getCleanedTeams().all;
+            if(['single_elim','double_elim'].includes(fId) && tm.length>1) {
+                let byes = TournamentGenerator.calculateByeSlots(tm.length);
+                if(byes.length>0) {
+                    ui.classList.remove("hidden"); 
+                    const cntText = document.getElementById("byeCountText");
+                    if(cntText) cntText.innerText = byes.length;
+                    let prev = {}; document.querySelectorAll('.bye-select').forEach(s => prev[s.dataset.index]=s.value);
+                    const container = document.getElementById("byeSlotContainer");
+                    if(container) {
+                        container.innerHTML = byes.map(b => `<div class="flex items-center justify-between bg-white dark:bg-slate-800 p-2.5 rounded-lg border border-indigo-100 dark:border-indigo-800/50 shadow-sm gap-3"><div class="flex flex-col w-[55%]"><span class="text-[9px] font-black text-indigo-400 uppercase">Bye ${b.seq}</span><span class="text-xs font-bold text-slate-700 dark:text-slate-300 truncate">${b.pos}</span></div><select class="bye-select w-[45%] p-2 text-[11px] font-semibold text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded outline-none focus:border-indigo-500 shadow-inner" data-index="${b.index}" onchange="UTM.TournamentGenerator.preventDupes(this); UTM.StorageManager.saveState();"><option value="">-- Auto --</option>${tm.map(t=>`<option value="${t}" ${prev[b.index]===t?'selected':''}>${t}</option>`).join('')}</select></div>`).join('');
+                    }
+                } else ui.classList.add("hidden");
+            } else ui.classList.add("hidden");
+        },
+        renderExceptions() {
+            const el = document.getElementById('exceptionList');
+            if(!el) return;
+            el.innerHTML = State.exceptions.map((ex, i) => `<div class="flex justify-between items-center bg-white dark:bg-slate-800 p-2 rounded-lg border border-red-100 dark:border-red-900/30 text-xs text-red-800 dark:text-red-400 shadow-sm"><span class="font-medium">${ex.date} | ${ex.session==='All'?'Full Day Skip':'Skip '+ex.session}</span><button onclick="UTM.ScheduleEngine.removeException(${i})" class="text-red-500 bg-red-50 dark:bg-red-900/20 hover:bg-red-500 hover:text-white w-6 h-6 flex items-center justify-center rounded-md transition font-bold">✕</button></div>`).join('');
+        },
+        renderResults() {
+            let html = Object.keys(State.results).reverse().map(id => {
+                let r = State.results[id], w1 = r.score1>r.score2, w2 = r.score2>r.score1;
+                let txt = w1 ? `<span class="text-green-600 dark:text-green-400 font-bold">${r.t1} Wins</span>` : w2 ? `<span class="text-green-600 dark:text-green-400 font-bold">${r.t2} Wins</span>` : `<span class="text-slate-500 dark:text-slate-400 font-bold">Draw</span>`;
+                return `<div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl shadow-sm p-6 hover:shadow-md transition active:scale-95 cursor-pointer" onclick="UTM.MatchEngine.openCenter('${id}','${r.t1.replace(/'/g,"\\'")}','${r.t2.replace(/'/g,"\\'")}')"><div class="flex justify-between items-center border-b border-slate-100 dark:border-slate-700 pb-3 mb-4"><span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest bg-slate-100 dark:bg-slate-900 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700/50">${id} - ${r.round}</span><span class="text-[10px] text-slate-400 font-semibold">${r.date} • ${r.time}</span></div><div class="space-y-4"><div class="flex justify-between items-center"><div class="flex items-center gap-3 overflow-hidden"><div class="w-8 h-8 rounded-full text-white text-xs font-bold flex items-center justify-center ${Utils.getColor(r.t1)}">${r.t1.charAt(0).toUpperCase()}</div><span class="font-bold ${w1?'text-slate-900 dark:text-white':'text-slate-500 dark:text-slate-400'} truncate w-32">${r.t1}</span></div><span class="text-3xl font-black ${w1?'text-slate-900 dark:text-white':'text-slate-300 dark:text-slate-600'}">${r.score1}</span></div><div class="flex justify-between items-center"><div class="flex items-center gap-3 overflow-hidden"><div class="w-8 h-8 rounded-full text-white text-xs font-bold flex items-center justify-center ${Utils.getColor(r.t2)}">${r.t2.charAt(0).toUpperCase()}</div><span class="font-bold ${w2?'text-slate-900 dark:text-white':'text-slate-500 dark:text-slate-400'} truncate w-32">${r.t2}</span></div><span class="text-3xl font-black ${w2?'text-slate-900 dark:text-white':'text-slate-300 dark:text-slate-600'}">${r.score2}</span></div></div><div class="mt-5 pt-3 border-t border-slate-100 dark:border-slate-700 text-[11px] text-slate-500 dark:text-slate-400 flex justify-between"><span class="truncate">📍 ${r.ground}</span>${txt}</div></div>`;
+            }).join('');
+            const out = document.getElementById('resultsOutput');
+            if(out) out.innerHTML = html || `<div class="col-span-full text-center py-20 text-slate-400 dark:text-slate-500">No completed matches.</div>`;
+        },
+        calcStandings() {
+            let s = {};
+            State.matches.forEach(m => {
+                if(m.t1 && !m.t1.startsWith('Winner') && m.t1!=='BYE') s[m.t1] = {p:0,w:0,l:0,d:0,gf:0,ga:0,gd:0,pts:0};
+                if(m.t2 && !m.t2.startsWith('Winner') && m.t2!=='BYE') s[m.t2] = {p:0,w:0,l:0,d:0,gf:0,ga:0,gd:0,pts:0};
+            });
+            Object.values(State.results).forEach(r => {
+                if(s[r.t1]) { s[r.t1].p++; s[r.t1].gf+=r.score1; s[r.t1].ga+=r.score2; s[r.t1].gd = s[r.t1].gf-s[r.t1].ga; }
+                if(s[r.t2]) { s[r.t2].p++; s[r.t2].gf+=r.score2; s[r.t2].ga+=r.score1; s[r.t2].gd = s[r.t2].gf-s[r.t2].ga; }
+                if(r.score1>r.score2) { if(s[r.t1]){s[r.t1].w++; s[r.t1].pts+=3;} if(s[r.t2]){s[r.t2].l++;} }
+                else if(r.score2>r.score1) { if(s[r.t2]){s[r.t2].w++; s[r.t2].pts+=3;} if(s[r.t1]){s[r.t1].l++;} }
+                else { if(s[r.t1]){s[r.t1].d++; s[r.t1].pts+=1;} if(s[r.t2]){s[r.t2].d++; s[r.t2].pts+=1;} }
+            });
+            let a = Object.keys(s).map(k => ({n:k, ...s[k]})).sort((a,b) => b.pts-a.pts || b.gd-a.gd || b.gf-a.gf);
+            const out = document.getElementById('standingsOutput');
+            if(out) out.innerHTML = `<table class="w-full text-left text-sm mt-4 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-sm"><thead class="bg-slate-100 dark:bg-slate-900/80 text-slate-600 dark:text-slate-400"><tr><th class="p-3">Rank</th><th class="p-3 w-1/3">Team</th><th class="p-3">P</th><th class="p-3">W</th><th class="p-3">D</th><th class="p-3">L</th><th class="p-3">GD</th><th class="p-3 font-black text-blue-600">PTS</th></tr></thead><tbody class="divide-y divide-slate-100 dark:divide-slate-700 bg-white dark:bg-slate-800">${a.map((t,i)=>`<tr><td class="p-3 font-bold">${i+1}</td><td class="p-3 font-bold flex items-center gap-2"><div class="w-4 h-4 rounded-full ${Utils.getColor(t.n)}"></div>${t.n}</td><td class="p-3">${t.p}</td><td class="p-3 text-green-600 font-bold">${t.w}</td><td class="p-3 text-yellow-600">${t.d}</td><td class="p-3 text-red-500">${t.l}</td><td class="p-3 font-mono">${t.gd>0?'+'+t.gd:t.gd}</td><td class="p-3 font-black text-blue-600 text-lg">${t.pts}</td></tr>`).join('')}</tbody></table>`;
+        },
+        filterMatches(q) {
+            q = q.toLowerCase();
+            document.querySelectorAll('.match-row-item').forEach(r => r.style.display = r.innerText.toLowerCase().includes(q) ? 'flex' : 'none');
+        },
+        initDrag() {
+            const slider = document.querySelector('.bracket-scroll'); if(!slider) return;
+            let isDown = false, sX, sL, sY, sT;
+            slider.onmousedown = e => { isDown = true; slider.classList.add('grabbing-cursor'); sX = e.pageX - slider.offsetLeft; sY = e.pageY - slider.offsetTop; sL = slider.scrollLeft; sT = slider.scrollTop; };
+            slider.onmouseleave = slider.onmouseup = () => { isDown = false; slider.classList.remove('grabbing-cursor'); };
+            slider.onmousemove = e => { if(!isDown) return; e.preventDefault(); slider.scrollLeft = sL - (e.pageX - slider.offsetLeft - sX); slider.scrollTop = sT - (e.pageY - slider.offsetTop - sY); };
+        }
+    };
+
+    // --- 7. TOURNAMENT GENERATOR ---
+    const TournamentGenerator = {
+        getCleanedTeams() {
+            let divs = Array.from(document.querySelectorAll('.division-item')).map(d => ({ name: d.querySelector('.div-name').value.trim(), teams: d.querySelector('.div-teams').value.split(/[\n,]+/).map(t=>t.trim()).filter(t=>t) }));
+            let cnts = {}, all = [];
+            divs.forEach(d => d.teams.forEach(t => { let n = t; if(cnts[t]) { cnts[t]++; n=`${t} (${cnts[t]})`; } else cnts[t]=1; all.push(n); }));
+            return { divs, all };
+        },
+        calculateByeSlots(n) {
+            let pwr = Math.pow(2, Math.ceil(Math.log2(n))); if (n === 1) pwr = 2;
+            let NB = pwr - n, U = Math.ceil(n / 2);
+            let bArr = [], lb = n-1, ut = 0, lt = U, ub = U-1;
+            for(let i=0; i<NB; i++) {
+                if(i%4===0) bArr.push({seq:i+1, pos:"Bottom Lower", index:lb--});
+                else if(i%4===1) bArr.push({seq:i+1, pos:"Top Upper", index:ut++});
+                else if(i%4===2) bArr.push({seq:i+1, pos:"Top Lower", index:lt++});
+                else bArr.push({seq:i+1, pos:"Bottom Upper", index:ub--});
+            }
+            return bArr.sort((a,b)=>a.seq-b.seq);
+        },
+        preventDupes(sel) { if(sel.value) document.querySelectorAll('.bye-select').forEach(s => { if(s !== sel && s.value === sel.value) s.value = ""; }); },
+        shuffleRoster() {
+            document.querySelectorAll('.div-teams').forEach(ta => {
+                let lines = ta.value.split(/[\n,]+/).map(t=>t.trim()).filter(t=>t);
+                for(let i=lines.length-1; i>0; i--) { const j=Math.floor(Math.random()*(i+1)); [lines[i],lines[j]]=[lines[j],lines[i]]; }
+                ta.value = lines.join('\n');
+            });
+            UIRenderer.handleByesUI(); StorageManager.saveState(); Utils.toast("Mixed Roster!");
+        },
+        loadTemplate() {
+            const nameEl = document.getElementById('tourneyName'); if(nameEl) nameEl.value = "World Cup"; 
+            const sportEl = document.getElementById('tourneySport'); if(sportEl) sportEl.value = "Football";
+            const catEl = document.getElementById('tournamentCategory'); if(catEl) catEl.value = "combination"; 
+            UIRenderer.updateSubTypes(); 
+            const typeEl = document.getElementById('tournamentType'); if(typeEl) typeEl.value = "league_knockout";
+            
+            const listEl = document.getElementById('divisionList');
+            if(listEl) {
+                listEl.innerHTML = `<div class="division-item bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl p-3 relative shadow-sm"><input type="text" class="div-name w-full text-xs font-extrabold bg-transparent border-b border-slate-200 dark:border-slate-600 mb-2 pb-1 uppercase tracking-widest text-slate-700 dark:text-slate-200" value="Group A" onchange="UTM.StorageManager.saveState()"><textarea class="div-teams w-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-700 rounded-lg p-2.5 text-sm custom-scrollbar outline-none focus:border-blue-400 transition" rows="4" oninput="UTM.UIRenderer.handleByesUI(); UTM.StorageManager.saveState();">Lions\nTigers\nBears\nWolves</textarea></div><div class="division-item bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl p-3 relative shadow-sm mt-3"><input type="text" class="div-name w-full text-xs font-extrabold bg-transparent border-b border-slate-200 dark:border-slate-600 mb-2 pb-1 uppercase tracking-widest text-slate-700 dark:text-slate-200" value="Group B" onchange="UTM.StorageManager.saveState()"><textarea class="div-teams w-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-700 rounded-lg p-2.5 text-sm custom-scrollbar outline-none focus:border-blue-400 transition" rows="4" oninput="UTM.UIRenderer.handleByesUI(); UTM.StorageManager.saveState();">Eagles\nHawks\nFalcons\nRavens</textarea></div>`;
+            }
+            Utils.toast("Template Loaded"); UIRenderer.handleByesUI(); StorageManager.saveState();
+        },
+        generate() {
+            const catEl = document.getElementById("tournamentCategory");
+            const typeEl = document.getElementById("tournamentType");
+            const out = document.getElementById("scheduleOutput");
+            if (!catEl || !typeEl || !out) return;
+            
+            const cat = catEl.value; 
+            const fId = typeEl.value;
+            let { divs, all } = this.getCleanedTeams();
+            
+            State.matches=[]; State.itinerary=[]; State.results={}; State.colors={}; State.counter=1;
+            if(cat==='combination' && divs.length<2) return Utils.toast("Combination needs 2+ Pools", true);
+            if(all.length<2) return Utils.toast("Need 2+ teams", true);
+            
+            out.innerHTML = ""; out.className = "block text-slate-800 dark:text-slate-200 pointer-events-auto";
+            const resOut = document.getElementById('resultsOutput');
+            if(resOut) resOut.innerHTML = `<div class="col-span-full text-center py-20 text-slate-400">No completed matches.</div>`;
+            const standOut = document.getElementById('standingsOutput');
+            if(standOut) standOut.innerHTML = '';
+            
+            const header = document.getElementById('printHeader');
+            if (header) {
+                const name = document.getElementById('tourneyName')?.value || "Tourney";
+                const sport = document.getElementById('tourneySport')?.value || "Bracket";
+                header.innerHTML = `<h1 class="text-3xl font-black uppercase">${name}</h1><p class="text-lg text-slate-500 uppercase">${sport}</p>`;
+            }
+
+            let wrap = document.createElement('div');
+            
+            if (cat === "combination") {
+                wrap.innerHTML += `<h2 class="text-xl font-black uppercase mb-4 mt-4 inline-block border-b-4 border-blue-500">Phase 1: Pools</h2>`;
+                this.buildLG(divs, false, "P1", wrap); let adv=[];
+                if(['league_knockout','league_league'].includes(fId)) divs.forEach(d=> adv.push(`1st ${d.name}`, `2nd ${d.name}`));
+                else { divs.forEach(d=>adv.push(`Winner ${d.name}`)); }
+                wrap.innerHTML += `<h2 class="text-xl font-black uppercase mt-12 mb-4 inline-block border-b-4 border-yellow-500">Phase 2: Championship</h2>`;
+                if(fId && fId.includes('knockout')) this.buildKO(adv, {}, "Finals", wrap); else this.buildLG([{name:"Finals", teams:adv}], false, "Finals", wrap);
+            } else if (cat.includes("elim") || cat === "knockout") {
+                let sB={}; document.querySelectorAll('.bye-select').forEach(s => {if(s.value) sB[s.dataset.index]=s.value;});
+                this.buildKO(all, sB, "", wrap);
+            } else if (cat === "league") { this.buildLG(divs, fId==='double_league', "", wrap); } 
+            else if (cat === "swiss") { this.buildSwiss(all, wrap); }
+
+            out.appendChild(wrap);
+            ScheduleEngine.build();
+            UIRenderer.switchTab('bracket');
+            ['printBtn','exportBtn','matchCountBadge','searchMatches'].forEach(id => {
+                let el = document.getElementById(id);
+                if(el) el.classList.remove('hidden');
+            });
+            const badge = document.getElementById('matchCountBadge');
+            if (badge) badge.innerText = `${State.matches.length} Matches`;
+            
+            const tabSt = document.getElementById('tab-standings');
+            if (tabSt) {
+                if(['league', 'swiss'].includes(cat)) { tabSt.classList.remove('hidden'); UIRenderer.calcStandings(); }
+                else tabSt.classList.add('hidden');
+            }
+            
+            UIRenderer.initDrag(); StorageManager.saveState(); Utils.toast("Tournament Built!");
+        },
+        buildKO(teams, sByes, pfx, container) {
+            let n = teams.length;
+            let pwr = Math.pow(2, Math.ceil(Math.log2(n))); if(n === 1) pwr = 2;
+            let byes = this.calculateByeSlots(n);
+            let unS = teams.filter(t => !Object.values(sByes).includes(t));
+            let brk = new Array(n).fill(null); 
+            
+            byes.forEach(b => {
+                if(sByes[b.index]) { b.targetTeam = sByes[b.index]; } 
+                else { b.targetTeam = unS.shift(); }
+                brk[b.index] = { n: b.targetTeam, bye: true };
+            });
+
+            for (let i = 0; i < n; i++) {
+                if (!brk[i]) brk[i] = { n: unS.shift()||'TBD', bye: false };
+            }
+
+            let mM=[], idx=0;
+            while(idx < n) {
+                if(brk[idx].bye) { mM.push({t1:brk[idx].n, t2:null, bye:true}); idx++; }
+                else { mM.push({t1:brk[idx].n, t2:brk[idx+1]?.n, bye:false}); idx+=2; }
+            }
+
+            let H=90, G=16, d=H+G, mTop=0, totalH = Math.max((pwr/2)*(H+G) + 150, 400);
+            let html=`<div class="relative min-w-max pb-24 pr-24"><div class="flex flex-row gap-[64px] pl-4 pt-10 items-start min-w-max" style="height:${totalH}px;">`;
+            
+            for(let r=1; r<=Math.log2(pwr); r++) {
+                let rt = mM.length===1?"FINAL":mM.length===2?"SEMI-FINAL":mM.length===4?"QUARTER-FINAL":`Round ${r}`, vS = d/2;
+                html += `<div class="flex flex-col w-[260px] shrink-0 relative h-full" style="gap:${d-H}px; padding-top:${mTop}px;"><h4 class="absolute -top-10 w-full text-center font-extrabold text-slate-400 uppercase text-[11px] tracking-widest">${rt}</h4>`;
+                
+                for(let i=0; i<mM.length; i++) {
+                    let m=mM[i], isT=i%2===0, nxt=r<Math.log2(pwr);
+                    if(!m.bye) { m.id=`M${State.counter++}`; State.matches.push({id:m.id, t1:String(m.t1||'TBD'), t2:String(m.t2||'TBD'), round:pfx?`${pfx} - ${rt}`:rt, format:'ko'}); m.w=`Winner ${m.id}`; } 
+                    else m.w=m.t1;
+
+                    let cHtml = !nxt ? `<div class="absolute right-[-32px] w-[32px] h-[3px] bg-slate-400 dark:bg-slate-600 z-0" style="top:44px;"></div>` : `<div class="absolute right-[-32px] w-[32px] h-[3px] bg-slate-400 dark:bg-slate-600 z-0" style="top:44px;"></div><div class="absolute right-[-32px] w-[3px] bg-slate-400 dark:bg-slate-600 z-0" style="${isT?'top:44px;':'bottom:43px;'} height:${vS+3}px;"></div>`;
+                    let lHtml = r>1 ? `<div class="absolute left-[-32px] w-[32px] h-[3px] bg-slate-400 dark:bg-slate-600 z-0" style="top:44px;"></div>` : '';
+                    let clk = m.bye?"":`onclick="UTM.MatchEngine.openCenter('${m.id}','${String(m.t1).replace(/'/g,"\\'")}','${String(m.t2).replace(/'/g,"\\'")}')"`;
+                    let w1=m.t1?.startsWith('Winner M')?m.t1.replace('Winner ',''):'', w2=m.t2?.startsWith('Winner M')?m.t2.replace('Winner ',''):'';
+
+                    html += `<div class="relative w-[260px] h-[90px] shrink-0 group">${lHtml}${cHtml}<div class="absolute inset-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm flex flex-col z-10 ${m.bye?'':'cursor-pointer hover:border-blue-400 hover:shadow-md transition active:scale-95'}" ${clk}><div class="bg-slate-50 dark:bg-slate-900/50 px-3 h-[26px] border-b border-slate-100 dark:border-slate-700 flex items-center justify-end"><span class="text-[9px] font-bold text-slate-400 uppercase">${m.bye?'Auto Advance':`Match ${m.id.replace('M','')}`}</span></div><div class="flex items-center justify-between px-3 h-[32px] border-b border-slate-100 dark:border-slate-700"><div class="flex items-center gap-2 overflow-hidden"><div class="w-1 h-4 rounded-sm shrink-0 color-slot-line ${Utils.getColor(m.t1)}" ${w1?`data-wait="${w1}"`:''}></div><span class="text-[13px] font-bold truncate name-slot ${w1?'text-slate-400 italic dark:text-slate-500':'text-slate-800 dark:text-slate-200'}" ${w1?`data-wait="${w1}"`:''}>${m.t1||'TBD'}</span></div><div id="br-${m.id}-s1" class="w-5 h-5 rounded-md bg-slate-50 dark:bg-slate-900 shrink-0 flex items-center justify-center text-[10px] font-bold shadow-inner"></div></div>${m.bye?`<div class="flex items-center px-3 h-[32px] bg-slate-50/50 dark:bg-slate-800/50"><span class="text-[11px] font-bold text-slate-400 pl-3">BYE</span></div>`:`<div class="flex items-center justify-between px-3 h-[32px] bg-white dark:bg-slate-800"><div class="flex items-center gap-2 overflow-hidden"><div class="w-1 h-4 rounded-sm shrink-0 color-slot-line ${Utils.getColor(m.t2)}" ${w2?`data-wait="${w2}"`:''}></div><span class="text-[13px] font-bold truncate name-slot ${w2?'text-slate-400 italic dark:text-slate-500':'text-slate-800 dark:text-slate-200'}" ${w2?`data-wait="${w2}"`:''}>${m.t2||'TBD'}</span></div><div id="br-${m.id}-s2" class="w-5 h-5 rounded-md bg-slate-50 dark:bg-slate-900 shrink-0 flex items-center justify-center text-[10px] font-bold shadow-inner"></div></div>`}</div></div>`;
+                }
+                html += `</div>`;
+                
+                if(mM.length===1) {
+                    let wId = String(mM[0].w).replace('Winner ','');
+                    html += `<div class="flex flex-col w-[260px] shrink-0 relative h-full" style="padding-top:${mTop}px;"><h4 class="absolute -top-10 w-full text-center font-extrabold text-yellow-500 uppercase text-[11px] drop-shadow-sm">CHAMPION</h4><div class="relative w-[260px] h-[90px] shrink-0 group"><div class="absolute left-[-32px] w-[32px] h-[3px] bg-slate-400 dark:bg-slate-600 z-0" style="top:44px;"></div><div class="absolute inset-0 bg-gradient-to-b from-yellow-50 to-white dark:from-yellow-900/20 dark:to-slate-800 border-[3px] border-yellow-400 dark:border-yellow-600 rounded-2xl shadow-xl flex flex-col items-center justify-center p-3 z-10 transform hover:scale-105 transition-transform cursor-default"><div class="text-4xl mb-1 drop-shadow-md">🏆</div><div class="text-[13px] font-black text-yellow-800 dark:text-yellow-400 text-center w-full truncate name-slot text-slate-400 italic" data-wait="${wId}">${mM[0].w}</div></div></div></div>`; break;
+                }
+                mTop += vS; d *= 2; let t=[]; for(let i=0;i<mM.length;i+=2) t.push({t1:mM[i].w, t2:mM[i+1].w, bye:false}); mM=t;
+            }
+            container.innerHTML += html + `</div></div>`;
+        },
+        buildLG(divs, isDouble, pfx, container) {
+            let html = `<div class="flex gap-6 h-full pb-4 p-2 min-w-max overflow-visible">`;
+            divs.forEach(d => {
+                let tm=d.teams, n=tm.length, pt=[...tm]; if(n%2!==0){pt.push("BYE"); n++;}
+                let rounds = n - 1; let mult = isDouble ? 2 : 1;
+
+                html += `<div class="flex flex-col min-w-[360px] w-[360px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm shrink-0"><div class="bg-slate-100 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-700 font-black px-5 py-3.5 text-sm text-center uppercase tracking-widest text-slate-800 dark:text-slate-200">${d.name}</div><div class="p-5 space-y-6 custom-scrollbar overflow-y-auto">`;
+                for(let it=0; it<mult; it++) {
+                    let cur=[...pt], leg=isDouble?`Leg ${it+1}`:'';
+                    for(let r=0; r<rounds; r++) {
+                        html += `<div class="space-y-3"><div class="flex justify-between text-[11px] font-bold text-slate-400 uppercase border-b dark:border-slate-700 pb-1"><span>Round ${(it*rounds)+r+1}</span><span>${leg}</span></div>`;
+                        for(let i=0; i<n/2; i++) {
+                            let t1=cur[i], t2=cur[n-1-i]; if(it===1 && t1!=="BYE" && t2!=="BYE") [t1,t2]=[t2,t1];
+                            if(t1==="BYE"||t2==="BYE") {
+                                let pT=t1==="BYE"?t2:t1; html += `<div class="bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-xl shadow-sm flex flex-col h-[90px]"><div class="bg-slate-50 dark:bg-slate-900/50 px-3 h-[26px] border-b dark:border-slate-700 flex justify-end items-center"><span class="text-[9px] font-bold text-slate-400 uppercase">Auto Advance</span></div><div class="flex items-center px-3 h-[32px] border-b dark:border-slate-700 gap-2.5"><div class="w-5 h-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center ${Utils.getColor(pT)}">${pT.charAt(0).toUpperCase()}</div><span class="text-[13px] font-bold text-slate-800 dark:text-slate-200 truncate w-56">${pT}</span></div><div class="px-3 h-[32px] flex items-center bg-slate-50/50 dark:bg-slate-800/50"><span class="text-[11px] font-bold text-slate-400 ml-10 opacity-60">BYE</span></div></div>`;
+                            } else {
+                                let mI=`M${State.counter++}`; State.matches.push({id:mI, t1:String(t1), t2:String(t2), round:`${pfx||d.name} R${(it*rounds)+r+1}`, format:'lg'});
+                                html += `<div class="bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-xl shadow-sm flex flex-col h-[90px] cursor-pointer hover:border-blue-400 transition active:scale-95" onclick="UTM.MatchEngine.openCenter('${mI}', '${String(t1).replace(/'/g,"\\'")}','${String(t2).replace(/'/g,"\\'")}')"><div class="bg-slate-50 dark:bg-slate-900/50 px-3 h-[26px] border-b dark:border-slate-700 flex justify-end items-center"><span class="text-[9px] font-bold text-slate-400 uppercase">Match ${mI.replace('M','')}</span></div><div class="flex items-center justify-between px-3 h-[32px] border-b dark:border-slate-700"><div class="flex items-center gap-2.5"><div class="w-5 h-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center ${Utils.getColor(t1)}">${t1.charAt(0).toUpperCase()}</div><span class="text-[13px] font-bold text-slate-800 dark:text-slate-200 truncate w-40">${t1}</span></div><div id="br-${mI}-s1" class="w-5 h-5 bg-slate-50 dark:bg-slate-900 rounded flex items-center justify-center text-[10px]"></div></div><div class="flex items-center justify-between px-3 h-[32px] bg-white dark:bg-slate-800"><div class="flex items-center gap-2.5"><div class="w-5 h-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center ${Utils.getColor(t2)}">${t2.charAt(0).toUpperCase()}</div><span class="text-[13px] font-bold text-slate-800 dark:text-slate-200 truncate w-40">${t2}</span></div><div id="br-${mI}-s2" class="w-5 h-5 bg-slate-50 dark:bg-slate-900 rounded flex items-center justify-center text-[10px]"></div></div></div>`;
+                            }
+                        }
+                        html += `</div>`; cur.splice(1,0,cur.pop());
+                    }
+                }
+                html += `</div></div>`;
+            });
+            container.innerHTML += html + `</div>`;
+        },
+        buildSwiss(teams, container) {
+            let html = `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto p-6">`;
+            for(let i=0; i<teams.length; i+=2) {
+                let t1=String(teams[i]), t2=teams[i+1]?String(teams[i+1]):null;
+                if(!t2) html+=`<div class="bg-slate-100 dark:bg-slate-800 border-2 border-dashed border-slate-300 dark:border-slate-600 p-4 rounded-xl text-center font-bold text-slate-500 h-[90px] flex items-center justify-center">${t1} gets a BYE</div>`;
+                else {
+                    let mId=`M${State.counter++}`; State.matches.push({id:mId,t1,t2,round:'Swiss R1',format:'sw'});
+                    html+=`<div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm flex flex-col h-[90px] cursor-pointer hover:border-blue-400 active:scale-95 transition" onclick="UTM.MatchEngine.openCenter('${mId}','${t1.replace(/'/g,"\\'")}','${t2.replace(/'/g,"\\'")}')"><div class="bg-slate-50 dark:bg-slate-900/50 px-3 h-[26px] border-b border-slate-100 dark:border-slate-700 flex justify-end items-center"><span class="text-[9px] font-bold text-slate-400 uppercase">Match ${mId.replace('M','')}</span></div><div class="flex items-center justify-between px-3 h-[32px] border-b border-slate-100 dark:border-slate-700"><div class="flex gap-2 items-center"><div class="w-1 h-4 rounded ${Utils.getColor(t1)}"></div><span class="text-[13px] font-bold text-slate-800 dark:text-slate-200 truncate w-56">${t1}</span></div><div id="br-${mId}-s1" class="w-5 h-5 bg-slate-50 dark:bg-slate-900 rounded flex items-center justify-center text-[10px]"></div></div><div class="flex items-center justify-between px-3 h-[32px] bg-white dark:bg-slate-800"><div class="flex gap-2 items-center"><div class="w-1 h-4 rounded ${Utils.getColor(t2)}"></div><span class="text-[13px] font-bold text-slate-800 dark:text-slate-200 truncate w-56">${t2}</span></div><div id="br-${mId}-s2" class="w-5 h-5 bg-slate-50 dark:bg-slate-900 rounded flex items-center justify-center text-[10px]"></div></div></div>`;
+                }
+            }
+            container.innerHTML += html + `</div>`;
+        }
+    };
+
+    // --- 8. SCHEDULE ENGINE ---
+    const ScheduleEngine = {
+        addException() {
+            let d = document.getElementById('exceptionDate').value, s = document.getElementById('exceptionSession').value;
+            if(d && !State.exceptions.some(e => e.date === d && e.session === s)) {
+                State.exceptions.push({date: d, session: s}); UIRenderer.renderExceptions(); StorageManager.saveState();
+            }
+        },
+        removeException(i) { State.exceptions.splice(i, 1); UIRenderer.renderExceptions(); StorageManager.saveState(); },
+        build() {
+            const out = document.getElementById("itineraryOutput");
+            if(State.matches.length===0) return out.innerHTML = `<div class="text-slate-500 text-center pt-10 font-medium">Generate bracket first.</div>`;
+
+            let sDate = Utils.parseDate(document.getElementById('startDate').value), eDate = Utils.parseDate(document.getElementById('endDate').value);
+            if (eDate.getTime() < sDate.getTime()) { eDate = new Date(sDate.getTime()); document.getElementById('endDate').value = Utils.toYMD(eDate); }
+            
+            let currP = new Date(sDate.getFullYear(), sDate.getMonth(), sDate.getDate(), 12,0,0); 
+            let endP = new Date(eDate.getFullYear(), eDate.getMonth(), eDate.getDate(), 12,0,0);
+            let tDays = Math.round((endP.getTime()-currP.getTime())/86400000)+1;
+
+            let gRaw = document.getElementById('groundNames').value.trim()||"1";
+            let gList = !isNaN(gRaw) ? Array.from({length:parseInt(gRaw)},(_,i)=>`Ground ${i+1}`) : gRaw.split(',').map(s=>s.trim()).filter(s=>s);
+            if(gList.length===0) gList.push("Main Venue");
+
+            const dur = parseInt(document.getElementById('matchDuration').value)||60, buf = parseInt(document.getElementById('bufferDuration').value)||10, rst = parseInt(document.getElementById('restDuration').value)||30;
+            const op = Utils.parseTime(document.getElementById('openingTime')?.value||"08:00"), cp = Utils.parseTime(document.getElementById('closingTime')?.value||"18:00");
+
+            let sess = [];
+            ['m','a','e'].forEach(x => {
+                let sEl = document.getElementById(x+'Start'), eEl = document.getElementById(x+'End');
+                if(sEl && eEl) {
+                    let s = Utils.parseTime(sEl.value), e = Utils.parseTime(eEl.value);
+                    if(s<e) sess.push({s, e, n: x==='m'?'Morning':x==='a'?'Afternoon':'Evening'});
+                }
+            });
+            if(sess.length===0) sess = [{s: 540, e: 1020, n: "Full Day"}];
+
+            const getValidSess = (time, duration, dt) => {
+                let ymd = Utils.toYMD(dt), exps = Array.isArray(State.exceptions) ? State.exceptions : [];
+                let act = sess.filter(s => !exps.some(ex => ex.date === ymd && (ex.session === 'All' || ex.session === s.n)));
+                for(let s of act) {
+                    if(time >= s.s && (time+duration) <= s.e) return s;
+                    if(time < s.s && (s.s+duration) <= s.e) return { override: s.s, s }; 
+                }
+                return null;
+            };
+
+            let itin = [{ type: 'ceremony', name: 'Opening Ceremony', date: new Date(currP), timeMins: op, duration: 60 }];
+            let currYMD = Utils.toYMD(currP), gFree = new Array(gList.length).fill(0), tNext = {};
+            let remM = State.matches.length, remD = tDays, dLimit = Math.ceil(remM/Math.max(1,remD)), dDone = 0;
+
+            for (let m of State.matches) {
+                let scheduled = false, safe = 0;
+                while(!scheduled && safe<1000) {
+                    safe++;
+                    if(dDone >= dLimit && remD > 1) {
+                        currP.setDate(currP.getDate()+1); currYMD = Utils.toYMD(currP);
+                        gFree.fill(0); remD--; remM-=dDone; dDone=0; dLimit=Math.ceil(remM/Math.max(1,remD));
+                    }
+                    
+                    let eT = sess[0].s;
+                    let t1R = (tNext[m.t1] && tNext[m.t1].d===currYMD) ? tNext[m.t1].t : 0;
+                    let t2R = (tNext[m.t2] && tNext[m.t2].d===currYMD) ? tNext[m.t2].t : 0;
+                    let reqT = Math.max(eT, t1R, t2R);
+
+                    let sG = -1, bestT = 9999;
+                    for(let g=0; g<gList.length; g++) {
+                        let gR = Math.max(reqT, gFree[g]);
+                        let actSess = sess.filter(s => !State.exceptions.some(ex => ex.date === currYMD && (ex.session === 'All' || ex.session === s.n)));
+                        let sFit = null;
+                        for (let s of actSess) { if (gR >= s.s && (gR + dur) <= s.e) { sFit = {o: gR, s}; break; } if (gR < s.s && (s.s + dur) <= s.e) { sFit = {o: s.s, s}; break; } }
+                        
+                        if(sFit) { let aT = sFit.o; if(aT < bestT) { bestT = aT; sG = g; } }
+                    }
+
+                    if(sG !== -1) {
+                        let actSess = sess.filter(s => !State.exceptions.some(ex => ex.date === currYMD && (ex.session === 'All' || ex.session === s.n)));
+                        let sObj = actSess.find(s => bestT>=s.s && bestT<=s.e) || sess[0];
+                        itin.push({ type: 'match', id: m.id, t1: String(m.t1), t2: String(m.t2), round: m.round, date: new Date(currP), timeMins: bestT, ground: gList[sG], sessionName: sObj.n });
+                        let fT = bestT + dur; gFree[sG] = fT + buf; let nR = fT + rst;
+                        tNext[m.t1] = {d: currYMD, t: nR}; tNext[m.t2] = {d: currYMD, t: nR}; tNext[`Winner ${m.id}`] = {d: currYMD, t: nR};
+                        dDone++; scheduled = true;
+                    } else {
+                        if (safe >= 990) {
+                            sG = 0; bestT = reqT;
+                            itin.push({ type: 'match', id: m.id, t1: String(m.t1), t2: String(m.t2), round: m.round, date: new Date(currP), timeMins: bestT, ground: gList[sG], sessionName: "Overtime" });
+                            let fT = bestT + dur; gFree[sG] = fT + buf; let nR = fT + rst;
+                            tNext[m.t1] = {d: currYMD, t: nR}; tNext[m.t2] = {d: currYMD, t: nR}; tNext[`Winner ${m.id}`] = {d: currYMD, t: nR};
+                            dDone++; scheduled = true;
+                        } else {
+                            currP.setDate(currP.getDate()+1); currYMD = Utils.toYMD(currP); gFree.fill(0); 
+                            if(remD>1){ remD--; remM-=dDone; dLimit=Math.ceil(remM/Math.max(1,remD)); } dDone=0;
+                        }
+                    }
+                }
+            }
+            itin.push({ type: 'ceremony', name: 'Closing Ceremony & Awards', date: new Date(Math.max(endP.getTime(), currP.getTime())), timeMins: cp, duration: 60 });
+            State.itinerary = itin; this.render();
+        },
+        render() {
+            let html = '<div class="pb-10">'; let cD = '';
+            State.itinerary.sort((a,b) => { if(isNaN(a.date)||isNaN(b.date))return 0; return a.date.getTime()===b.date.getTime() ? a.timeMins-b.timeMins : a.date.getTime()-b.date.getTime(); });
+            let dCnt = 1;
+            State.itinerary.forEach(i => {
+                if(isNaN(i.date)) return; let dS = i.date.toDateString();
+                if(dS !== cD) {
+                    let dD = "TBD"; try { dD = i.date.toLocaleDateString(undefined, {weekday:'short',month:'short',day:'numeric',year:'numeric'}); } catch(e) { dD=dS; }
+                    html += `<div class="mt-8 mb-4 border-b-2 border-slate-200 dark:border-slate-700 pb-2 flex justify-between items-end page-break-avoid"><h3 class="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight">Day ${dCnt} <span class="text-sm text-slate-400 font-bold ml-2 hidden sm:inline">(${dD})</span></h3></div>`; cD = dS; dCnt++;
+                }
+
+                if (i.type === 'ceremony') {
+                    html += `<div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 p-4 rounded-2xl shadow-sm flex items-center gap-4 mb-3 page-break-avoid match-row-item"><div class="bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 text-2xl">🎉</div><div><div class="text-[10px] text-blue-500 dark:text-blue-400 font-bold uppercase tracking-widest">${Utils.formatTime(i.timeMins)}</div><div class="font-bold text-slate-800 dark:text-white text-lg">${i.name}</div></div></div>`;
+                } else {
+                    let t1Str = String(i.t1 || 'TBD'), t2Str = String(i.t2 || 'TBD');
+                    let color1 = Utils.getColor(t1Str), color2 = Utils.getColor(t2Str);
+                    let isW1 = t1Str.startsWith('Winner') || t1Str.startsWith('1st') || t1Str.startsWith('2nd');
+                    let isW2 = t2Str.startsWith('Winner') || t2Str.startsWith('1st') || t2Str.startsWith('2nd');
+                    let w1 = isW1 ? t1Str.replace('Winner ', '') : ''; let w2 = isW2 ? t2Str.replace('Winner ', '') : '';
+                    let hasRes = State.results[i.id], s1Text = hasRes ? hasRes.score1 : "", s2Text = hasRes ? hasRes.score2 : "";
+                    let sCls = hasRes ? "bg-blue-50 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-700" : "hidden";
+                    
+                    html += `<div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 sm:p-5 rounded-3xl shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 mb-3 page-break-avoid transition-all hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md cursor-pointer active:scale-[0.98] match-row-item" onclick="UTM.MatchEngine.openCenter('${i.id}', '${t1Str.replace(/'/g, "\\'")}', '${t2Str.replace(/'/g, "\\'")}')">
+                        <div class="flex items-center gap-3 md:w-1/4 shrink-0"><div class="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-sm font-bold px-3 py-2 rounded-xl text-center min-w-[90px] shadow-inner">${Utils.formatTime(i.timeMins)}</div><div class="text-xs"><div class="font-bold text-slate-700 dark:text-slate-300 truncate w-32">${i.ground || 'TBA'}</div><div class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">${i.sessionName}</div></div></div>
+                        <div class="flex-grow flex items-center justify-center gap-2 sm:gap-3 w-full"><div class="w-[45%] flex items-center justify-end gap-2 overflow-hidden"><span class="text-right font-bold ${isW1?'text-slate-400 italic dark:text-slate-500':'text-slate-800 dark:text-slate-200'} md:text-[15px] truncate name-slot">${t1Str}</span><div class="w-7 h-7 rounded-full text-white text-[11px] font-bold flex items-center justify-center ${color1} shadow-inner shrink-0 color-slot-circle">${isW1?'?':t1Str.charAt(0).toUpperCase()}</div><div id="it-${i.id}-s1" class="w-8 h-8 border dark:border-slate-600 rounded-xl shrink-0 flex items-center justify-center font-bold sm:ml-2 text-sm ${sCls}">${s1Text}</div></div><div class="bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 text-[10px] font-black px-2 py-1 rounded-md shrink-0 ${hasRes?'hidden':''}" id="it-${i.id}-vs">VS</div><div class="w-[45%] flex items-center justify-start gap-2 overflow-hidden"><div id="it-${i.id}-s2" class="w-8 h-8 border dark:border-slate-600 rounded-xl shrink-0 flex items-center justify-center font-bold sm:mr-2 text-sm ${sCls}">${s2Text}</div><div class="w-7 h-7 rounded-full text-white text-[11px] font-bold flex items-center justify-center ${color2} shadow-inner shrink-0 color-slot-circle">${isW2?'?':t2Str.charAt(0).toUpperCase()}</div><span class="text-left font-bold ${isW2?'text-slate-400 italic dark:text-slate-500':'text-slate-800 dark:text-slate-200'} md:text-[15px] truncate name-slot">${t2Str}</span></div></div>
+                        <div class="md:w-1/4 text-right shrink-0 flex md:flex-col justify-between md:justify-end items-center md:items-end"><span class="block text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1 md:mb-1">${i.round}</span><span class="text-[11px] font-bold text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700 inline-block uppercase tracking-widest shadow-sm">${i.id}</span></div>
+                    </div>`;
+            }
+        });
+        document.getElementById('itineraryOutput').innerHTML = html + '</div>';
+    }
+    };
+
+    // --- 9. LIVE MATCH CENTER ---
+    const MatchEngine = {
+        openCenter(id, t1, t2) {
+            document.getElementById('matchModal').classList.remove('hidden'); document.getElementById('modalMatchId').innerText = id; aMId = id;
+            let m = State.matches.find(x => x.id === id); cT1 = String(m?m.t1:t1); cT2 = String(m?m.t2:t2);
+            document.getElementById('modalT1').innerText = cT1; document.getElementById('modalT2').innerText = cT2;
+            let cC1 = Utils.getColor(cT1), cC2 = Utils.getColor(cT2);
+            document.getElementById('modalColor1').className = `absolute top-0 left-0 w-full h-2 ${cC1}`; document.getElementById('modalColor2').className = `absolute top-0 left-0 w-full h-2 ${cC2}`;
+            document.getElementById('modalIcon1').className = `w-24 h-24 mx-auto rounded-full text-white flex items-center justify-center text-4xl font-black mb-5 shadow-lg border-[4px] border-white dark:border-slate-700 ${cC1}`; document.getElementById('modalIcon1').innerText = cT1.startsWith('Winner') ? '?' : cT1.charAt(0).toUpperCase();
+            document.getElementById('modalIcon2').className = `w-24 h-24 mx-auto rounded-full text-white flex items-center justify-center text-4xl font-black mb-5 shadow-lg border-[4px] border-white dark:border-slate-700 ${cC2}`; document.getElementById('modalIcon2').innerText = cT2.startsWith('Winner') ? '?' : cT2.charAt(0).toUpperCase();
+            
+            if(State.results[id]) {
+                document.getElementById('modalCompletedOverlay').classList.remove('hidden');
+                sc1 = State.results[id].score1; sc2 = State.results[id].score2; f1 = State.results[id].fouls1||0; f2 = State.results[id].fouls2||0;
+                document.getElementById('modalScore1').innerText = sc1; document.getElementById('modalScore2').innerText = sc2;
+                document.getElementById('modalFouls1').innerText = f1; document.getElementById('modalFouls2').innerText = f2;
+                document.getElementById('modalTimer').innerText = State.results[id].duration; document.getElementById('matchNotes').value = State.results[id].notes || '';
+            } else { document.getElementById('modalCompletedOverlay').classList.add('hidden'); this.reset(); }
+        },
+        closeCenter() { document.getElementById('matchModal').classList.add('hidden'); clearInterval(timerInt); mRun = false; StorageManager.saveState(); },
+        updateScore(n, v) { 
+            if(n===1){ sc1=Math.max(0,sc1+v); document.getElementById('modalScore1').innerText=sc1; if(v>0) this.logEvent(`PTS ${cT1}`,'bg-blue-50 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'); }
+            else { sc2=Math.max(0,sc2+v); document.getElementById('modalScore2').innerText=sc2; if(v>0) this.logEvent(`PTS ${cT2}`,'bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-300'); }
+        },
+        updateFoul(n, v) {
+            if(n===1){ f1=Math.max(0,f1+v); document.getElementById('modalFouls1').innerText=f1; this.logEvent(`FOUL ${cT1}`,'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 font-bold'); }
+            else { f2=Math.max(0,f2+v); document.getElementById('modalFouls2').innerText=f2; this.logEvent(`FOUL ${cT2}`,'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 font-bold'); }
+        },
+        toggleTimer() {
+            const btn = document.getElementById('timerBtn');
+            if(mRun) {
+                clearInterval(timerInt); mRun = false; btn.innerText = "RESUME"; btn.className = "bg-blue-600 text-white py-4 rounded-2xl font-black shadow-md hover:bg-blue-700 transition transform active:scale-95 tracking-wide uppercase text-sm";
+                document.getElementById('modalLiveDot').classList.remove('animate-pulse'); this.logEvent("Match Paused", "bg-yellow-50 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300");
+            } else {
+                document.getElementById('noEventsMsg').style.display = 'none'; mRun = true; btn.innerText = "PAUSE"; btn.className = "bg-red-600 text-white py-4 rounded-2xl font-black shadow-md hover:bg-red-700 transition transform active:scale-95 tracking-wide uppercase text-sm";
+                document.getElementById('modalLiveDot').classList.add('animate-pulse'); this.logEvent(mSec===0?"Match Started":"Match Resumed", "bg-purple-50 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300");
+                timerInt = setInterval(() => { mSec++; document.getElementById('modalTimer').innerText = `${Math.floor(mSec/60).toString().padStart(2,'0')}:${(mSec%60).toString().padStart(2,'0')}`; }, 1000);
+            }
+        },
+        reset() {
+            clearInterval(timerInt); mRun=false; mSec=0; sc1=0; sc2=0; f1=0; f2=0;
+            ['1','2'].forEach(n => { document.getElementById(`modalScore${n}`).innerText="0"; document.getElementById(`modalFouls${n}`).innerText="0"; });
+            document.getElementById('modalTimer').innerText="00:00"; document.getElementById('matchNotes').value="";
+            document.getElementById('modalEvents').innerHTML=`<li class="text-center text-slate-400 dark:text-slate-500 text-xs italic py-5 bg-slate-50 dark:bg-slate-900 rounded-xl border border-dashed border-slate-200 dark:border-slate-700" id="noEventsMsg">Match hasn't started yet. Start the timer to begin.</li>`;
+            document.getElementById('timerBtn').innerText="START"; document.getElementById('timerBtn').className="bg-blue-600 text-white py-4 rounded-2xl font-black shadow-md hover:bg-blue-700 transition transform active:scale-95 tracking-wide uppercase text-sm";
+            document.getElementById('modalLiveDot').classList.remove('animate-pulse'); document.getElementById('modalCompletedOverlay').classList.add('hidden');
+        },
+        logEvent(txt, cls) {
+            let ul = document.getElementById('modalEvents'), li = document.createElement('li');
+            li.className = `flex items-center justify-between p-3 rounded-xl border border-slate-100 dark:border-slate-700/50 ${cls} fade-in shadow-sm`;
+            li.innerHTML = `<span class="font-bold">${txt}</span><span class="text-[10px] font-mono bg-white/80 dark:bg-black/20 px-2 py-0.5 rounded shadow-sm">${Math.floor(mSec/60).toString().padStart(2,'0')}:${(mSec%60).toString().padStart(2,'0')}</span>`;
+            ul.prepend(li);
+        },
+        finish() {
+            let iObj = State.itinerary.find(i=>i.id===aMId), lObj = State.matches.find(m=>m.id===aMId);
+            let wName = sc1>sc2 ? cT1 : sc2>sc1 ? cT2 : "Draw";
+            
+            State.results[aMId] = {
+                t1:cT1, t2:cT2, score1:sc1, score2:sc2, fouls1:f1, fouls2:f2, winner:wName,
+                time: iObj ? Utils.formatTime(iObj.timeMins) : "TBD", date: iObj && !isNaN(iObj.date) ? iObj.date.toLocaleDateString() : "TBD",
+                ground: iObj ? (iObj.ground||"TBA") : "TBD", round: lObj ? lObj.round : "Round", 
+                duration: document.getElementById('modalTimer').innerText, notes: document.getElementById('matchNotes').value
+            };
+
+            ['1','2'].forEach(n => {
+                let brS = document.getElementById(`br-${aMId}-s${n}`); if(brS) { brS.innerText = n==='1'?sc1:sc2; brS.className="w-5 h-5 rounded-md bg-blue-50 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700 flex items-center justify-center text-[10px] font-bold shadow-inner"; }
+                let itS = document.getElementById(`it-${aMId}-s${n}`); if(itS) { itS.innerText = n==='1'?sc1:sc2; itS.classList.remove('hidden'); itS.className="w-8 h-8 border dark:border-slate-600 rounded-xl flex items-center justify-center font-bold sm:mr-2 text-sm bg-blue-50 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-700"; }
+            });
+            let itVs = document.getElementById(`it-${aMId}-vs`); if(itVs) itVs.classList.add('hidden');
+
+            if (wName !== "Draw" && !wName.startsWith("Winner")) {
+                let wColor = Utils.getColor(wName), wInit = wName.charAt(0).toUpperCase();
+                document.querySelectorAll(`[data-wait="${aMId}"]`).forEach(el => {
+                    if (el.classList.contains('name-slot')) { el.innerText = wName; el.title = wName; el.classList.remove('text-slate-400','italic','dark:text-slate-500'); el.classList.add('text-slate-800','dark:text-slate-200'); }
+                    if (el.classList.contains('color-slot-line')) { el.className = `w-1 h-4 rounded-sm shrink-0 color-slot-line ${wColor}`; }
+                    if (el.classList.contains('color-slot-circle')) { el.className = `w-7 h-7 rounded-full text-white text-[11px] font-bold flex items-center justify-center shadow-inner shrink-0 color-slot-circle ${wColor}`; el.innerText = wInit; }
+                });
+                State.matches.forEach(m => { if(m.t1===`Winner ${aMId}`) m.t1=wName; if(m.t2===`Winner ${aMId}`) m.t2=wName; });
+                State.itinerary.forEach(i => { if(i.t1===`Winner ${aMId}`) i.t1=wName; if(i.t2===`Winner ${aMId}`) i.t2=wName; });
+            }
+
+            UIRenderer.renderResults(); 
+            if(['league','swiss'].includes(document.getElementById('tournamentCategory').value)) UIRenderer.calcStandings();
+            document.getElementById('modalCompletedOverlay').classList.remove('hidden');
+            clearInterval(timerInt); mRun=false; StorageManager.saveState(); Utils.toast(`Match Saved!`);
+        }
+    };
+
+    return { ThemeManager, PWAService, StorageManager, CSVManager, ExportManager, UIRenderer, TournamentGenerator, ScheduleEngine, MatchEngine };
+})();
+
+// Bootstrap Application on Load
+window.onload = () => window.UTM.StorageManager.loadState();
+</script>
+</body>
+</html>
